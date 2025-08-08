@@ -274,52 +274,56 @@ for comp in companies_sel:
     st.plotly_chart(corr_fig, use_container_width=True)
 
     # Scatter: returns vs sentiment
-    ret_aligned = ret.reindex(price_df["date"]).values
-    sent_aligned = pd.Series(s_daily.values, index=price_df["date"]).values
-    mask = ~(pd.isna(ret_aligned) | pd.isna(sent_aligned))
-    x = sent_aligned[mask]; y = ret_aligned[mask]
-    if len(x) > 2:
-        a, b = np.polyfit(x, y, 1)
-        x_line = np.linspace(x.min(), x.max(), 50); y_line = a * x_line + b
-        pearson = pd.Series(x).corr(pd.Series(y), method="pearson")
-        spearman = pd.Series(x).corr(pd.Series(y), method="spearman")
-        sc_fig = go.Figure()
-        sc_fig.add_trace(go.Scatter(x=x, y=y, mode="markers", name="Points", opacity=0.7))
-        sc_fig.add_trace(go.Scatter(x=x_line, y=y_line, mode="lines", name="Fit (OLS)"))
-        sc_fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=280)
-        sc_fig.update_xaxes(title_text="Sentiment Index (-1..1)"); sc_fig.update_yaxes(title_text="Daily Return")
-        st.plotly_chart(sc_fig, use_container_width=True)
-        st.caption(f"Pearson r = {pearson:.3f} • Spearman ρ = {spearman:.3f}")
-    else:
-        st.info("Not enough aligned data points for scatter analysis.")
+  align_sc = pd.DataFrame({
+    "ret": ret.reindex(price_df["date"]).to_numpy(),
+    "sent": pd.Series(s_daily.to_numpy(), index=price_df["date"]).to_numpy()
+}).dropna()
+x = align_sc["sent"].to_numpy()
+y = align_sc["ret"].to_numpy()
+if len(x) > 2:
+    a, b = np.polyfit(x, y, 1)
+    x_line = np.linspace(x.min(), x.max(), 50); y_line = a * x_line + b
+    pearson = pd.Series(x).corr(pd.Series(y), method="pearson")
+    spearman = pd.Series(x).corr(pd.Series(y), method="spearman")
+    sc_fig = go.Figure()
+    sc_fig.add_trace(go.Scatter(x=x, y=y, mode="markers", name="Points", opacity=0.7))
+    sc_fig.add_trace(go.Scatter(x=x_line, y=y_line, mode="lines", name="Fit (OLS)"))
+    sc_fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=280)
+    sc_fig.update_xaxes(title_text="Sentiment Index (-1..1)"); sc_fig.update_yaxes(title_text="Daily Return")
+    st.plotly_chart(sc_fig, use_container_width=True)
+    st.caption(f"Pearson r = {pearson:.3f} • Spearman ρ = {spearman:.3f}")
+else:
+    st.info("Not enough aligned data points for scatter analysis.")
+
 
     # Lag analysis
-    sent_series = pd.Series(s_daily.values, index=price_df["date"])
-    ret_series = price_df["Close"].pct_change()
-    if int(lag_days) > 0:
-        x_lag = sent_series.shift(int(lag_days)); y_lag = ret_series
-    elif int(lag_days) < 0:
-        x_lag = sent_series; y_lag = ret_series.shift(abs(int(lag_days)))
-    else:
-        x_lag = sent_series; y_lag = ret_series
-    align = pd.concat([x_lag, y_lag], axis=1, keys=["sent", "ret"]).dropna()
-    if not align.empty and len(align) > 5:
-        px = align["sent"].values; py = align["ret"].values
-        try:
-            a_lag, b_lag = np.polyfit(px, py, 1)
-            xfit = np.linspace(px.min(), px.max(), 50); yfit = a_lag * xfit + b_lag
-        except Exception:
-            xfit, yfit = None, None
-        pear_lag = pd.Series(px).corr(pd.Series(py), method="pearson")
-        spear_lag = pd.Series(px).corr(pd.Series(py), method="spearman")
-        lag_fig = go.Figure()
-        lag_fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="Lagged Points", opacity=0.7))
-        if xfit is not None: lag_fig.add_trace(go.Scatter(x=xfit, y=yfit, mode="lines", name="Lagged Fit (OLS)"))
-        lag_fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=280)
-        lag_fig.update_xaxes(title_text=f"Sentiment Index (shift={int(lag_days)})"); lag_fig.update_yaxes(title_text="Daily Return")
-        st.plotly_chart(lag_fig, use_container_width=True)
-        st.caption(f"Lagged Pearson r = {pear_lag:.3f} • Lagged Spearman ρ = {spear_lag:.3f}")
-    else:
-        st.info("Not enough data points for lag analysis with current settings.")
+    # Lag analysis (robust alignment)
+sent_series = pd.Series(s_daily.to_numpy(), index=price_df["date"])
+ret_series = price_df["Close"].pct_change()
+if int(lag_days) > 0:
+    x_lag = sent_series.shift(int(lag_days)); y_lag = ret_series
+elif int(lag_days) < 0:
+    x_lag = sent_series; y_lag = ret_series.shift(abs(int(lag_days)))
+else:
+    x_lag = sent_series; y_lag = ret_series
+align = pd.concat([x_lag, y_lag], axis=1, keys=["sent", "ret"]).dropna()
+if not align.empty and len(align) > 5:
+    px = align["sent"].to_numpy(); py = align["ret"].to_numpy()
+    try:
+        a_lag, b_lag = np.polyfit(px, py, 1)
+        xfit = np.linspace(px.min(), px.max(), 50); yfit = a_lag * xfit + b_lag
+    except Exception:
+        xfit, yfit = None, None
+    pear_lag = pd.Series(px).corr(pd.Series(py), method="pearson")
+    spear_lag = pd.Series(px).corr(pd.Series(py), method="spearman")
+    lag_fig = go.Figure()
+    lag_fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="Lagged Points", opacity=0.7))
+    if xfit is not None: lag_fig.add_trace(go.Scatter(x=xfit, y=yfit, mode="lines", name="Lagged Fit (OLS)"))
+    lag_fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=280)
+    lag_fig.update_xaxes(title_text=f"Sentiment Index (shift={int(lag_days)})"); lag_fig.update_yaxes(title_text="Daily Return")
+    st.plotly_chart(lag_fig, use_container_width=True)
+    st.caption(f"Lagged Pearson r = {pear_lag:.3f} • Lagged Spearman ρ = {spear_lag:.3f}")
+else:
+    st.info("Not enough data points for lag analysis with current settings.")
 
 st.success("Ready. Use the sidebar to filter. Lite build avoids heavy ML dependencies.")
