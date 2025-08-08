@@ -273,8 +273,8 @@ for comp in companies_sel:
     corr_fig.update_yaxes(title_text="Correlation (-1..1)", range=[-1, 1])
     st.plotly_chart(corr_fig, use_container_width=True)
 
-    # Scatter: returns vs sentiment
-  align_sc = pd.DataFrame({
+   # Scatter: returns vs sentiment (robust alignment)
+align_sc = pd.DataFrame({
     "ret": ret.reindex(price_df["date"]).to_numpy(),
     "sent": pd.Series(s_daily.to_numpy(), index=price_df["date"]).to_numpy()
 }).dropna()
