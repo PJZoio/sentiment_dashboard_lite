@@ -1,0 +1,11 @@
+streamlit
+langdetect
+vaderSentiment
+deep-translator
+pandas
+requests
+feedparser
+plotly
+yfinance
+numpy
+streamlit-autorefresh
